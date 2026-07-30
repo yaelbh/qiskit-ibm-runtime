@@ -478,6 +478,59 @@ class TestRunQuantumProgram(IBMTestCase):
         # theta=π, phi=π: CX|10⟩ = |11⟩, X on q1 → |10⟩
         self.assert_correct({"c": np.array([True, False])}, sweep_slice(1, 1))
 
+    def test_program_with_circuit_and_samplex_items(self):
+        """Program that contains both a CircuitItem and a SamplexItem.
+
+        Verifies that ``run_quantum_program`` processes each item independently and
+        returns one result dictionary per item in the correct order.
+        """
+        num_randomizations = 8
+        shots = 256
+
+        qc = QuantumCircuit(3, 3)
+        qc.h(0)
+        qc.cx(0, 1)
+        qc.cx(1, 2)
+        qc.measure([0, 1, 2], [0, 1, 2])
+        pm = generate_preset_pass_manager(
+            backend=FakeFez(),
+            initial_layout=[17, 18, 19],
+            optimization_level=0,
+        )
+        transpiled_ghz = pm.run(qc)
+
+        qc2 = QuantumCircuit(2, 2)
+        qc2.cx(0, 1)
+        qc2.measure([0, 1], [0, 1])
+        pm2 = generate_preset_pass_manager(
+            backend=FakeFez(),
+            initial_layout=[17, 27],
+            optimization_level=0,
+        )
+        pm2.post_scheduling = generate_boxing_pass_manager()
+        transpiled_cx = pm2.run(qc2)
+        template_circuit, samplex = build(transpiled_cx)
+
+        program = QuantumProgram(shots=shots)
+        program.append_circuit_item(transpiled_ghz)
+        program.append_samplex_item(template_circuit, samplex=samplex, shape=(num_randomizations,))
+
+        result = run_quantum_program(AerSimulator(method="stabilizer"), program)
+
+        self.assertEqual(len(result), 2)
+
+        item_data_0 = result[0]
+        self.assertGreater(len(item_data_0), 0)
+        for key, arr in item_data_0.items():
+            self.assertEqual(arr.shape[0], shots)
+            for shot in arr:
+                self.assertTrue(
+                    all(shot == 0) or all(shot == 1),
+                    f"Unexpected measurement outcome {shot}—GHZ state should only yield 000 or 111",
+                )
+
+        self.assert_correct({"c": np.array([False, False])}, result[1])
+
     def test_unsupported_item_type_raises_type_error(self):
         """Test unsupported types."""
         fake_item = MagicMock()
