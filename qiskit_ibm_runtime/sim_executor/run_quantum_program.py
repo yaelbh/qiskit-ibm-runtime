@@ -75,8 +75,8 @@ def run_quantum_program(
 
     rng = np.random.default_rng(aer_sampler.seed)
 
-    result_list = []
-    metadata_list = []
+    pubs = []
+    item_samplex_data = []
 
     for prog_item in program.items:
         if noise_dict is not None:
@@ -95,19 +95,14 @@ def run_quantum_program(
                     bindings_array._data[k] = _round_to_clifford(v, angle_decimals)
             else:
                 bindings_array = None
-            sampler_res = aer_sampler.run(
-                [
-                    SamplerPub(
-                        circuit=circuit,
-                        parameter_values=bindings_array,
-                        shots=program.shots,
-                    )  # type: ignore
-                ]
-            ).result()
-            metadata_list.append(sampler_res[0].metadata)
-            bit_array = sampler_res[0].data
-            data = {key: ba.to_bool_array(order="little") for key, ba in dict(bit_array).items()}
-            result_list.append(data)
+            pubs.append(
+                SamplerPub(
+                    circuit=circuit,
+                    parameter_values=bindings_array,
+                    shots=program.shots,
+                )  # type: ignore
+            )
+            item_samplex_data.append(None)
 
         elif isinstance(prog_item, SamplexItem):
             samplex_data = broadcast_sample(
@@ -121,25 +116,31 @@ def run_quantum_program(
             )
             for k, v in bindings_array._data.items():
                 bindings_array._data[k] = _round_to_clifford(v, angle_decimals)
-            sampler_res = aer_sampler.run(
-                [
-                    SamplerPub(
-                        circuit=circuit,
-                        parameter_values=bindings_array,
-                        shots=program.shots,
-                    )  # type: ignore
-                ]
-            ).result()
-            metadata_list.append(sampler_res[0].metadata)
-            bit_array = sampler_res[0].data
-            bool_arrays = {
-                key: ba.to_bool_array(order="little") for key, ba in dict(bit_array).items()
-            }
-            data = {**samplex_data, **bool_arrays}
-            result_list.append(data)
+            pubs.append(
+                SamplerPub(
+                    circuit=circuit,
+                    parameter_values=bindings_array,
+                    shots=program.shots,
+                )  # type: ignore
+            )
+            item_samplex_data.append(samplex_data)
 
         else:
             raise TypeError(f"Unsupported QuantumProgramItem type: {type(prog_item)}")
+
+    sampler_results = aer_sampler.run(pubs).result()
+
+    result_list = []
+    metadata_list = []
+
+    for sampler_res, samplex_data in zip(sampler_results, item_samplex_data):
+        metadata_list.append(sampler_res.metadata)
+        bit_array = sampler_res.data
+        bool_arrays = {key: ba.to_bool_array(order="little") for key, ba in dict(bit_array).items()}
+        if samplex_data is None:
+            result_list.append(bool_arrays)
+        else:
+            result_list.append({**samplex_data, **bool_arrays})
 
     return QuantumProgramResult(
         data=result_list,
