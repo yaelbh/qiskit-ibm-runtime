@@ -168,3 +168,40 @@ class TestExecutor(IBMTestCase):
 
         self.assertGreater(fidelities[0], fidelities[1])
         self.assertGreater(fidelities[1], fidelities[2])
+
+    def test_simulator_options_as_dict(self):
+        """Test that ``simulator_options`` can be passed as a plain dict."""
+        circuit = make_mirror_circuit_with_phases(self.backend)
+
+        pm = generate_preset_pass_manager(backend=self.backend, optimization_level=0)
+        pm.post_scheduling = generate_boxing_pass_manager(
+            enable_gates=True,
+            enable_measures=True,
+            add_tags="unique_box",
+            inject_noise_site="after",
+        )
+
+        boxed_isa_circuit = pm.run(circuit)
+        isa_template, samplex = build(boxed_isa_circuit)
+
+        parameter_values = np.random.random((circuit.num_parameters,))
+
+        program = QuantumProgram(shots=100)
+        program.append_samplex_item(
+            isa_template, samplex=samplex, samplex_arguments={"parameter_values": parameter_values}
+        )
+
+        executor = Executor(
+            mode=AerSimulator(),
+            options={
+                "experimental": {
+                    "local_mode": True,
+                    "simulator_options": {"warn_absent": False},
+                }
+            },
+        )
+
+        # Should not raise AttributeError
+        job = executor.run(program)
+        result = job.result()
+        self.assertIsNotNone(result)
