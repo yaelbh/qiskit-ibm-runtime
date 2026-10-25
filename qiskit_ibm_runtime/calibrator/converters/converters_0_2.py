@@ -16,13 +16,16 @@ from __future__ import annotations
 
 from ibm_quantum_schemas.calibrator.version_0_2_dev import (
     OneAndTwoQubitOptions as SchemaOneAndTwoQubitOptions,
-    OptionsModel,
-    ParamsModel,
-    ReadoutAngleOptions as SchemaReadoutAngleOptions,
-    TlsBiasOptions as SchemaTlsBiasOptions,
-    TwoQubitFractionalOptions as SchemaTwoQubitFractionalOptions,
-    TwoQubitOptions as SchemaTwoQubitOptions,
 )
+from ibm_quantum_schemas.calibrator.version_0_2_dev import OptionsModel, ParamsModel
+from ibm_quantum_schemas.calibrator.version_0_2_dev import (
+    ReadoutAngleOptions as SchemaReadoutAngleOptions,
+)
+from ibm_quantum_schemas.calibrator.version_0_2_dev import TlsBiasOptions as SchemaTlsBiasOptions
+from ibm_quantum_schemas.calibrator.version_0_2_dev import (
+    TwoQubitFractionalOptions as SchemaTwoQubitFractionalOptions,
+)
+from ibm_quantum_schemas.calibrator.version_0_2_dev import TwoQubitOptions as SchemaTwoQubitOptions
 
 from ...options_models.calibrator import (
     CalibratorOptions,
