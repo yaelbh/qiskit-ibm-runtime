@@ -13,3 +13,4 @@
 """Converters for executor."""
 
 from .converters_0_1 import calibrator_program_from_0_1, calibrator_program_to_0_1
+from .converters_0_2 import calibrator_program_from_0_2, calibrator_program_to_0_2

@@ -18,8 +18,14 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Generic, TypeVar
 
 from ibm_quantum_schemas.calibrator.version_0_1 import ParamsModel as ParamsModel_0_1
+from ibm_quantum_schemas.calibrator.version_0_2_dev import ParamsModel as ParamsModel_0_2
 
-from .converters import calibrator_program_from_0_1, calibrator_program_to_0_1
+from .converters import (
+    calibrator_program_from_0_1,
+    calibrator_program_from_0_2,
+    calibrator_program_to_0_1,
+    calibrator_program_to_0_2,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -54,6 +60,9 @@ class ParamsConverter(Generic[ModelT]):
 CALIBRATOR_PARAMS_CONVERTERS = {
     "v0.1": ParamsConverter(
         ParamsModel_0_1, calibrator_program_from_0_1, calibrator_program_to_0_1
+    ),
+    "v0.2": ParamsConverter(
+        ParamsModel_0_2, calibrator_program_from_0_2, calibrator_program_to_0_2
     ),
 }
 """Converter to/from schema model for the inputs of calibrator jobs."""

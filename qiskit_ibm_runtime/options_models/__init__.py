@@ -32,6 +32,7 @@ Primitive options
    :toctree: ../stubs/
    :nosignatures:
 
+   CalibratorOptions
    ExecutorOptions
    EstimatorOptions
    NoiseLearnerV3Options
@@ -50,13 +51,18 @@ Suboptions
    EnvironmentOptions
    ExecutionOptions
    MeasureNoiseLearningOptions
+   OneAndTwoQubitOptions
    PecOptions
    PostCircuitBitFlipChecksOptions
    PreCircuitBitFlipChecksOptions
+   ReadoutAngleOptions
    ResilienceOptions
    SamplerExecutionOptions
    SimulatorOptions
+   TlsBiasOptions
    TwirlingOptions
+   TwoQubitFractionalOptions
+   TwoQubitOptions
    ZneOptions
 
 """
@@ -66,7 +72,14 @@ from .bit_flip_checks import (
     PostCircuitBitFlipChecksOptions,
     PreCircuitBitFlipChecksOptions,
 )
-from .calibrator import CalibratorOptions
+from .calibrator import (
+    CalibratorOptions,
+    OneAndTwoQubitOptions,
+    ReadoutAngleOptions,
+    TlsBiasOptions,
+    TwoQubitFractionalOptions,
+    TwoQubitOptions,
+)
 from .dynamical_decoupling import DynamicalDecouplingOptions
 from .environment import EnvironmentOptions
 from .estimator import EstimatorOptions

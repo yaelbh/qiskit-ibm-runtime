@@ -20,7 +20,14 @@ import pytest
 
 from qiskit_ibm_runtime.batch import Batch
 from qiskit_ibm_runtime.calibrator import Calibrator
-from qiskit_ibm_runtime.options_models.calibrator import CalibratorOptions
+from qiskit_ibm_runtime.options_models.calibrator import (
+    CalibratorOptions,
+    OneAndTwoQubitOptions,
+    ReadoutAngleOptions,
+    TlsBiasOptions,
+    TwoQubitFractionalOptions,
+    TwoQubitOptions,
+)
 from qiskit_ibm_runtime.qiskit_runtime_service import QiskitRuntimeService
 from qiskit_ibm_runtime.session import Session
 
@@ -38,6 +45,11 @@ class TestCalibratorOptions:
         calibrator = Calibrator(mode=backend)
         assert isinstance(calibrator.options, CalibratorOptions)
         assert calibrator.options == CalibratorOptions()
+        assert calibrator.options.readout_angle.enable is True
+        assert calibrator.options.one_and_two_qubit.enable is False
+        assert calibrator.options.two_qubit.enable is False
+        assert calibrator.options.two_qubit_fractional.enable is False
+        assert calibrator.options.tls_bias.enable is False
 
     def test_options_from_instance(self, registry: BaseRegistry) -> None:
         """Test constructing with a CalibratorOptions instance."""
@@ -92,6 +104,42 @@ class TestCalibratorOptions:
         calibrator = Calibrator(mode=backend)
         calibrator.options = {"experimental": {"test": "value"}}  # type: ignore[assignment]
         assert calibrator.options.experimental == {"test": "value"}
+
+    def test_suboptions_from_dict(self, registry: BaseRegistry) -> None:
+        """Test constructing with suboptions specified as dicts."""
+        service = QiskitRuntimeService(token="my_token")
+        backend = service.backend("common_backend")
+        opts_dict = {
+            "readout_angle": {"enable": False},
+            "one_and_two_qubit": {"enable": True},
+            "two_qubit": {"enable": True},
+            "two_qubit_fractional": {"enable": True},
+            "tls_bias": {"enable": True},
+        }
+        calibrator = Calibrator(mode=backend, options=opts_dict)
+        assert calibrator.options.readout_angle.enable is False
+        assert calibrator.options.one_and_two_qubit.enable is True
+        assert calibrator.options.two_qubit.enable is True
+        assert calibrator.options.two_qubit_fractional.enable is True
+        assert calibrator.options.tls_bias.enable is True
+
+    def test_suboptions_from_instances(self, registry: BaseRegistry) -> None:
+        """Test constructing with suboptions specified as model instances."""
+        service = QiskitRuntimeService(token="my_token")
+        backend = service.backend("common_backend")
+        opts = CalibratorOptions(
+            readout_angle=ReadoutAngleOptions(enable=False),
+            one_and_two_qubit=OneAndTwoQubitOptions(enable=True),
+            two_qubit=TwoQubitOptions(enable=True),
+            two_qubit_fractional=TwoQubitFractionalOptions(enable=True),
+            tls_bias=TlsBiasOptions(enable=True),
+        )
+        calibrator = Calibrator(mode=backend, options=opts)
+        assert calibrator.options.readout_angle.enable is False
+        assert calibrator.options.one_and_two_qubit.enable is True
+        assert calibrator.options.two_qubit.enable is True
+        assert calibrator.options.two_qubit_fractional.enable is True
+        assert calibrator.options.tls_bias.enable is True
 
 
 class TestCalibrator:

@@ -22,8 +22,16 @@ if TYPE_CHECKING:
     from ibm_quantum_schemas.calibrator.version_0_1 import (
         CalibratorResultModel as CalibratorResultModel_0_1,
     )
+    from ibm_quantum_schemas.calibrator.version_0_2_dev import (
+        CalibratorResultModel as CalibratorResultModel_0_2,
+    )
 
 
 def calibrator_result_from_0_1(model: CalibratorResultModel_0_1) -> CalibratorResult:
     """Convert a V0.1 model to a :class:`QuantumProgramResult`."""
+    return CalibratorResult(start=model.start, stop=model.stop)
+
+
+def calibrator_result_from_0_2(model: CalibratorResultModel_0_2) -> CalibratorResult:
+    """Convert a V0.2 model to a :class:`QuantumProgramResult`."""
     return CalibratorResult(start=model.start, stop=model.stop)

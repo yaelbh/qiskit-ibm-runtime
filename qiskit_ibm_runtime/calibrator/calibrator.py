@@ -69,7 +69,7 @@ class Calibrator:
     """
 
     _PROGRAM_ID = "calibrate"
-    _SCHEMA_VERSION = "v0.1"
+    _SCHEMA_VERSION = "v0.2"
 
     options: CalibratorOptions
     """The options of this calibrator."""
@@ -120,10 +120,6 @@ class Calibrator:
         Returns:
             A calibration job.
         """
-        inputs = {
-            "options": self.options.model_dump(mode="json", exclude={"environment"}),
-        }
-
         try:
             converter = CALIBRATOR_PARAMS_CONVERTERS[self._SCHEMA_VERSION]
         except KeyError:

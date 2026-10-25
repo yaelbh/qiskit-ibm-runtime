@@ -20,15 +20,19 @@ from typing import Any
 from ibm_quantum_schemas.calibrator.version_0_1 import (
     CalibratorResultModel as CalibratorResultModel_0_1,
 )
+from ibm_quantum_schemas.calibrator.version_0_2_dev import (
+    CalibratorResultModel as CalibratorResultModel_0_2,
+)
 
 from ...results import CalibratorResult
 from ..result_decoder import ResultDecoder
-from .converters import calibrator_result_from_0_1
+from .converters import calibrator_result_from_0_1, calibrator_result_from_0_2
 
 logger = logging.getLogger(__name__)
 
 AVAILABLE_DECODERS = {
     "v0.1": (calibrator_result_from_0_1, CalibratorResultModel_0_1),
+    "v0.2": (calibrator_result_from_0_2, CalibratorResultModel_0_2),
 }
 
 
