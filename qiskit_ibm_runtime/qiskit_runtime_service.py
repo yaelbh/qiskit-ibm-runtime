@@ -55,6 +55,11 @@ logger = logging.getLogger(__name__)
 SERVICE_NAME = "runtime"
 
 
+def _backend_names(backend_infos: list[dict[str, Any]]) -> list[tuple[str, bool]]:
+    """Return the backend names and whether they are mocks, given ``/backends`` entries."""
+    return [(info["name"], info.get("class") == "mock") for info in backend_infos]
+
+
 class QiskitRuntimeService:
     """Class for interacting with the IBM Quantum Compute (formerly Qiskit Runtime) service.
 
@@ -322,36 +327,48 @@ class QiskitRuntimeService:
             for inst, _ in instance_backends:
                 self._get_or_create_cloud_client(inst)
 
-    def _discover_backends_from_instance(self, instance: str) -> list[tuple[str, bool]]:
-        """Retrieve all backends from the given instance.
+    def _discover_backends(self, instances: Sequence[str]) -> dict[str, list[dict[str, Any]]]:
+        """Retrieve the backends available in each of the given instances.
+
+        The ``/backends`` response lists, for each backend, the instances it is accessible from.
+        This allows retrieving the backends of several instances with a single request, as long as
+        they are served by the same endpoint (instances in different regions are not).
 
         Returns:
-            A list of tuples with the backend name and if backend is a mock.
+            A dictionary, keyed by instance CRN, with the ``/backends`` entries of the backends
+            available in the instance. The list is empty if the instance could not be queried.
         """
-        # TODO refactor this, this is the slowest part
-        # ntc 5779 would make things a lot faster - get list of backends
-        # from global search API call
-        try:
-            if instance != self._active_api_client._instance:
-                if instance in self._api_clients:
-                    self._active_api_client = self._api_clients[instance]
-                else:
-                    new_client = self._create_new_cloud_api_client(instance)
-                    self._api_clients.update({instance: new_client})
-                    self._active_api_client = new_client
-            self._backends_info_per_instance[instance] = self._active_api_client.list_backends(True)
-            return [
-                (backend["name"], backend.get("class") == "mock")
-                for backend in self._backends_info_per_instance[instance]
-            ]
-        # On staging there some invalid instances returned that 403 when retrieving backends
-        except Exception:
-            logger.warning("Invalid instance %s", instance)
-            return []
+        crns_per_endpoint: dict[str, list[str]] = {}
+        for crn in instances:
+            endpoint = self._client_parameters(crn).get_runtime_api_base_url()
+            crns_per_endpoint.setdefault(endpoint, []).append(crn)
 
-    def _create_new_cloud_api_client(self, instance: str) -> RuntimeClient:
-        """Create a new api_client given an instance."""
-        self._client_params = ClientParameters(
+        backends: dict[str, list[dict[str, Any]]] = {crn: [] for crn in instances}
+        pending = list(crns_per_endpoint.values())
+        while pending:
+            crns = pending.pop()
+            try:
+                # The CRNs are passed as a comma-separated list in the `Service-CRN` header.
+                client = RuntimeClient(self._client_parameters(",".join(crns)))
+                devices = client.list_backends(True)
+            except Exception:
+                if len(crns) > 1:
+                    # Query the instances separately, so that invalid ones do not hide valid ones.
+                    pending.extend([crn] for crn in crns)
+                else:
+                    logger.warning("Invalid instance %s", crns[0])
+                continue
+            for device in devices:
+                for crn in device.get("instances", []):
+                    if crn in crns:
+                        backends[crn].append(device)
+            for crn in crns:
+                self._backends_info_per_instance[crn] = backends[crn]
+        return backends
+
+    def _client_parameters(self, instance: str) -> ClientParameters:
+        """Return the client parameters for the given instance."""
+        return ClientParameters(
             channel=self._account.channel,
             token=self._account.token,
             url=self._account.url,
@@ -361,7 +378,10 @@ class QiskitRuntimeService:
             private_endpoint=self._account.private_endpoint,
             url_resolver=self._url_resolver,
         )
-        return RuntimeClient(self._client_params)
+
+    def _create_new_cloud_api_client(self, instance: str) -> RuntimeClient:
+        """Create a new api_client given an instance."""
+        return RuntimeClient(self._client_parameters(instance))
 
     def _filter_instances_by_saved_preferences(self) -> None:
         """Filter instances by saved region and plan preferences."""
@@ -708,31 +728,27 @@ class QiskitRuntimeService:
                     raise IBMInputValueError(f"{instance} is not a valid instance.")
             # if an instance name is passed in and there are multiple crns,
             # return all matching crns (stored in self._saved_instances)
-            if self._saved_instances:
-                return [
-                    (inst, self._discover_backends_from_instance(inst))
-                    for inst in self._saved_instances
-                ]
-            return [(instance, self._discover_backends_from_instance(instance))]
+            crns = self._saved_instances or [instance]
+            return [
+                (crn, _backend_names(infos)) for crn, infos in self._discover_backends(crns).items()
+            ]
         if self._default_instance:
             # if an instance name is passed in and there are multiple crns,
             # return all matching crns (stored in self._saved_instances)
-            default_crn = self._account.instance
-            if self._saved_instances:
-                return [
-                    (inst, self._discover_backends_from_instance(inst))
-                    for inst in self._saved_instances
-                ]
-            return [(default_crn, self._discover_backends_from_instance(default_crn))]
+            crns = self._saved_instances or [self._account.instance]
+            return [
+                (crn, _backend_names(infos)) for crn, infos in self._discover_backends(crns).items()
+            ]
         if not self._all_instances:
             self._all_instances = self._account.list_instances()
         if not self._backend_instance_groups:
+            discovered = self._discover_backends([inst["crn"] for inst in self._all_instances])
             self._backend_instance_groups = [
                 {
                     "name": inst["name"],
                     "crn": inst["crn"],
                     "plan": inst["plan"],
-                    "backends": self._discover_backends_from_instance(inst["crn"]),
+                    "backends": _backend_names(discovered[inst["crn"]]),
                     "tags": inst["tags"],
                     "pricing_type": inst["pricing_type"],
                 }
@@ -1459,13 +1475,8 @@ class QiskitRuntimeService:
             client = self._get_api_client(instance)
             all_backends = client.list_backends()
         elif not self._default_instance:
-            for client in self._api_clients.values():
-                try:
-                    client_backends = client.list_backends()
-                    if client_backends:
-                        all_backends += client_backends
-                except RequestsApiError:
-                    continue
+            for instance_backends in self._discover_backends(list(self._api_clients)).values():
+                all_backends += instance_backends
         else:
             default_instance = self._account.instance
             if default_instance not in self._backends_info_per_instance:

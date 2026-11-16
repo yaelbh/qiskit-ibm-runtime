@@ -302,24 +302,30 @@ class BaseRegistry(FirstMatchRegistry):
 
         Dynamically return the list of backends, based on the contents of `self.backends`.
 
+        The ``Service-CRN`` header can contain several comma-separated CRNs. Each backend is
+        returned once, along with the requested instances that it is accessible from.
+
         References:
             https://quantum.cloud.ibm.com/docs/en/api/qiskit-runtime-rest/tags/backends
         """
-        # Validate the instance CRN.
-        instance = self.get_crn_from_request(request)
-        if instance.name not in self.instances:
+        # Validate the instance CRNs.
+        crns = str(request.headers.get("Service-CRN", "")).split(",")
+        instances = [instance for instance in self.instances.values() if instance.crn in crns]
+        if len(instances) != len(crns):
             return (404, {"Content-Type": "application/json"}, "{}")
 
         # Get filtering parameters.
         query_params = parse_qs(urlparse(request.url).query)
         include_mocks = query_params.get("include_mocks", [False][0])
 
-        if not include_mocks:
-            backends: Iterable[Backend] = (
-                backend for backend in self.backends[instance.name].values() if not backend.is_mock
-            )
-        else:
-            backends = self.backends[instance.name].values()
+        # Group the backends by name, with the instances that they are accessible from.
+        backends: dict[str, Backend] = {}
+        backend_instances: dict[str, list[str]] = defaultdict(list)
+        for instance in instances:
+            for backend in self.backends[instance.name].values():
+                if include_mocks or not backend.is_mock:
+                    backends.setdefault(backend.name, backend)
+                    backend_instances[backend.name].append(instance.crn)
 
         response_body = {
             "devices": [
@@ -327,9 +333,10 @@ class BaseRegistry(FirstMatchRegistry):
                     "name": backend.name,
                     "status": {"name": backend.status},
                     "queue_length": backend.queue_length,
+                    "instances": backend_instances[backend.name],
                 }
                 | ({"class": "mock"} if backend.is_mock else {})
-                for backend in backends
+                for backend in backends.values()
             ]
         }
         return (200, {"Content-Type": "application/json"}, json.dumps(response_body))
