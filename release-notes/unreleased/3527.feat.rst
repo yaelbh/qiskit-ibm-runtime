@@ -1,0 +1,5 @@
+The ``max_execution_time`` option set on the server-side primitives
+:class:`qiskit_ibm_runtime.server_side.SamplerV2` and
+:class:`qiskit_ibm_runtime.server_side.EstimatorV2` is now included in the job input options,
+so it is visible in :attr:`.RuntimeJobV2.inputs` and in the "Input options" of the job in the
+IBM Quantum Platform.

@@ -176,6 +176,7 @@ class OptionsV2(BaseOptions):
             sim_options["coupling_map"] = list(map(list, coupling_map.get_edges()))
 
         for fld in [
+            "max_execution_time",
             "default_precision",
             "default_shots",
             "seed_estimator",

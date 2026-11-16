@@ -80,6 +80,7 @@ class TestSamplerOptions:
             }
         )
         options = {
+            "max_execution_time": 100,
             "default_shots": 1000,
             "dynamical_decoupling": dynamical_decoupling,
             "twirling": {

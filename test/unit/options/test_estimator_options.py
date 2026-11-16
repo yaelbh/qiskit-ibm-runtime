@@ -180,6 +180,7 @@ class TestEstimatorOptions:
             }
         )
         options = {
+            "max_execution_time": 100,
             "default_precision": 0.5,
             "default_shots": 1000,
             "seed_estimator": 42,
