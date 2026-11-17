@@ -181,6 +181,10 @@ class Executor:
             self.options.max_execution_time or self.options.environment.max_execution_time
         )
 
+        # Record the requested limit in the inputs, so it is visible in the job's input options
+        if max_execution_time:
+            inputs["options"]["max_execution_time"] = max_execution_time
+
         return _run(
             program_id=self._PROGRAM_ID,
             options=to_runtime_options(self.options.environment, self._backend, max_execution_time),

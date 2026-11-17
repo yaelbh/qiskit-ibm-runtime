@@ -31,9 +31,11 @@ from qiskit_ibm_runtime.qiskit_runtime_service import QiskitRuntimeService
 from qiskit_ibm_runtime.quantum_program import QuantumProgram
 from qiskit_ibm_runtime.session import Session
 
-from ...registries import OneInstanceDryRunRegistry
+from ...registries import OneInstanceDryRunRegistry, get_submitted_jobs
 
 if TYPE_CHECKING:
+    from responses import RequestsMock
+
     from ...registries import BaseRegistry
 
 
@@ -162,6 +164,22 @@ class TestExecutor:
         executor = Executor(mode=backend)
         job = executor.run(program, dry_run=True)
         assert job.backend().name == "mock_foo"
+
+    @pytest.mark.parametrize("max_execution_time", [None, 300])
+    def test_run_max_execution_time(
+        self, max_execution_time: int | None, registry: BaseRegistry, responses: RequestsMock
+    ) -> None:
+        """``max_execution_time`` is recorded in the inputs, next to being sent as the cost."""
+        service = QiskitRuntimeService(token="my_token")
+        executor = Executor(
+            mode=service.backend("common_backend"),
+            options=ExecutorOptions(max_execution_time=max_execution_time),
+        )
+        executor.run(single_circuit_program())
+
+        (job,) = get_submitted_jobs(responses)
+        assert job.get("cost") == max_execution_time
+        assert job["params"]["options"].get("max_execution_time") == max_execution_time
 
     @pytest.mark.parametrize("mode_id", ["job", "session", "batch"])
     def test_mode_handling(self, mode_id: str, registry: BaseRegistry) -> None:

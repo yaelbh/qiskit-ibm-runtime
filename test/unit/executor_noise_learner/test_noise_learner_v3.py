@@ -33,9 +33,11 @@ from qiskit_ibm_runtime.qiskit_runtime_service import QiskitRuntimeService
 from qiskit_ibm_runtime.session import Session
 from qiskit_ibm_runtime.utils.utils import HAS_QNL
 
-from ...registries import OneInstanceDryRunRegistry
+from ...registries import OneInstanceDryRunRegistry, get_submitted_jobs
 
 if TYPE_CHECKING:
+    from responses import RequestsMock
+
     from ...registries import BaseRegistry
 
 
@@ -170,6 +172,31 @@ class TestNoiseLearnerRun:
 
         job = noise_learner.run(layers, dry_run=True)
         assert job.backend().name == "mock_foo"
+
+    @pytest.mark.parametrize("max_execution_time", [None, 300])
+    def test_run_max_execution_time(
+        self, max_execution_time: int | None, registry: BaseRegistry, responses: RequestsMock
+    ) -> None:
+        """``max_execution_time`` is recorded in the inputs, next to being sent as the cost."""
+        service = QiskitRuntimeService(token="my_token")
+        backend = service.backend("common_backend")
+        noise_learner = NoiseLearnerV3(
+            mode=backend, options=NoiseLearnerV3Options(max_execution_time=max_execution_time)
+        )
+
+        circuit = QuantumCircuit(2)
+        circuit.h(0)
+        circuit.cx(0, 1)
+        circuit.measure_all()
+
+        pass_manager = generate_preset_pass_manager(optimization_level=0, backend=backend)
+        pass_manager.post_scheduling = generate_boxing_pass_manager()
+        layers = find_unique_box_instructions(pass_manager.run(circuit).data)
+        noise_learner.run(layers)
+
+        (job,) = get_submitted_jobs(responses)
+        assert job.get("cost") == max_execution_time
+        assert job["params"]["options"].get("max_execution_time") == max_execution_time
 
     @pytest.mark.parametrize("mode_id", ["job", "session", "batch"])
     def test_mode_handling(self, mode_id: str, registry: BaseRegistry) -> None:
